@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Manager</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: auto; }
+        .card { padding: 20px; }
+        .progress-circle {
+            position: relative;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 5px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .progress-circle.active {
+            border-color: #26a69a;
+            border-width: 5px;
+            border-style: solid;
+        }
+        .timer-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .timer-item {
+            flex: 1 1 calc(50% - 20px);
+            max-width: calc(50% - 20px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h3 class="center-align">Timer Manager</h3>
+        <div class="card">
+            <div class="input-field">
+                <input type="text" id="timerName" placeholder="Timer-Name">
+                <label for="timerName">Timer-Name</label>
+            </div>
+            <div class="input-field">
+                <input type="number" id="timerDuration" placeholder="Sekunden" min="1">
+                <label for="timerDuration">Dauer in Sekunden</label>
+            </div>
+            <button class="btn waves-effect waves-light" onclick="addTimer()"><i class="fas fa-plus"></i></button>
+        </div>
+        <div id="timers" class="timer-grid"></div>
+    </div>
+
+    <script>
+        let timers = JSON.parse(localStorage.getItem('timers')) || [];
+
+        function saveTimers() {
+            localStorage.setItem('timers', JSON.stringify(timers));
+        }
+
+        function requestNotificationPermission() {
+            if (Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+        }
+
+        function sendNotification(message) {
+            if (Notification.permission === "granted") {
+                new Notification(message);
+            }
+        }
+
+        function addTimer() {
+            const name = document.getElementById('timerName').value.trim();
+            const duration = parseInt(document.getElementById('timerDuration').value);
+            if (name && !isNaN(duration) && duration > 0) {
+                timers.push({ id: Date.now(), name, duration, remaining: duration, running: false, interval: null });
+                saveTimers();
+                renderTimers();
+            }
+        }
+
+        function startTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (timer && !timer.running) {
+                timer.running = true;
+                timer.interval = setInterval(() => {
+                    timer.remaining--;
+                    if (timer.remaining <= 0) {
+                        clearInterval(timer.interval);
+                        timer.running = false;
+                        sendNotification(`Der Timer "${timer.name}" ist abgelaufen!`);
+                        resetTimer(id);
+                    }
+                    saveTimers();
+                    renderTimers();
+                }, 1000);
+                saveTimers();
+                renderTimers();
+            }
+        }
+
+        function stopTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (timer && timer.running) {
+                clearInterval(timer.interval);
+                timer.running = false;
+                saveTimers();
+                renderTimers();
+            }
+        }
+
+        function resetTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (timer) {
+                clearInterval(timer.interval);
+                timer.remaining = timer.duration;
+                timer.running = false;
+                saveTimers();
+                renderTimers();
+            }
+        }
+
+        function deleteTimer(id) {
+            timers = timers.filter(t => t.id !== id);
+            saveTimers();
+            renderTimers();
+        }
+
+        function renderTimers() {
+            const container = document.getElementById('timers');
+            container.innerHTML = '';
+            timers.forEach(timer => {
+                const progress = Math.round((timer.remaining / timer.duration) * 100);
+                const timerDiv = document.createElement('div');
+                timerDiv.classList.add('card', 'light-blue', 'lighten-5', 'timer-item');
+                timerDiv.innerHTML = `
+                    <div class="card-content">
+                        <span class="card-title">${timer.name}</span>
+                        <div class="progress-circle ${timer.running ? 'active' : ''}">
+                            ${progress}%
+                        </div>
+                        <p><strong>${timer.remaining}</strong> Sekunden</p>
+                        <div class="card-action">
+                            <button class="btn green" onclick="startTimer(${timer.id})"><i class="fas fa-play"></i></button>
+                            <button class="btn yellow darken-2" onclick="stopTimer(${timer.id})"><i class="fas fa-pause"></i></button>
+                            <button class="btn blue" onclick="resetTimer(${timer.id})"><i class="fas fa-undo"></i></button>
+                            <button class="btn red" onclick="deleteTimer(${timer.id})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(timerDiv);
+            });
+        }
+
+        requestNotificationPermission();
+        renderTimers();
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+</body>
+</html>
